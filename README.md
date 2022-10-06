@@ -49,6 +49,7 @@ Service:
 ```python
 zc = ZeroConnect()
 
+#TODO "node" vs ids vs record strings?
 def rxMessageConnection(messageSock, nodeId, serviceId):
     print(f"got message connection from {nodeId}")
     data = messageSock.recvMsg()

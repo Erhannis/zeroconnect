@@ -1,3 +1,5 @@
+import struct
+
 # Derived from http://stupidpythonideas.blogspot.com/2013/05/sockets-are-byte-streams-not-message.html
 class MessageSocket:
     def __init__(self, sock):
@@ -10,7 +12,7 @@ class MessageSocket:
         self.sock.sendall(data)
 
     def recvMsg(self):
-        lengthbuf = recvall(sock, 8)
+        lengthbuf = recvall(self.sock, 8)
         # Ditto
         length, = struct.unpack('!Q', lengthbuf)
         return recvall(self.sock, length)
