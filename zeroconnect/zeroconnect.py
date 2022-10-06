@@ -1,4 +1,4 @@
-from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
+from zeroconf import ServiceBrowser, ServiceListener, Zeroconf, ServiceInfo
 import uuid
 
 def getAddresses(): #TODO IPv6?
@@ -8,7 +8,7 @@ def getAddresses(): #TODO IPv6?
         print('%s: %s' % (ifaceName, ', '.join(addresses)))
         socket.inet_aton("127.0.0.1")
 
-class MyListener(ServiceListener):
+class ZCListener(ServiceListener):
     def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
         print(f"Service {name} updated, service info: {info}")
@@ -28,7 +28,6 @@ class ZeroConnect:
     def __init__(self):
         self.zeroconf = Zeroconf(ip_version=IPVersion.V4Only) #TODO All IPv?
         self.defaultId = str(uuid.uuid4())
-        pass
     
     def advertise(self, callback, serviceId, nodeId=None, port=-1, mode=SocketMode.Messages):
         """Advertise a service, and send new connections to `callback`"""
@@ -43,18 +42,26 @@ class ZeroConnect:
             addresses=getAddresses(),
             port=port,
         )
-        pass
+        self.zeroconf.register_service(info)
 
-    def scan(self, serviceId, nodeId, mode=SocketMode.Messages):
+    def scan(self, serviceId, nodeId, mode=SocketMode.Messages, timeout=30):
         if not nodeId:
-            something something #TODO
+            nodeId = self.defaultUuid
+        #TODO
 
-    def connectToFirst(self, serviceId, nodeId, mode=SocketMode.Messages):
+    def connectToFirst(self, serviceId, nodeId, mode=SocketMode.Messages, timeout=30):
         if not nodeId:
-            something something #TODO
+            nodeId = self.defaultUuid
+        #TODO
     
+    def connect(self, node, mode=SocketMode.Messages, timeout=30):
+        #TODO
+
+    def broadcast(self, message):
+        """Send message to all connected nodes"""
+
     def close(self): #TODO Review
-        self.zeroconf.unregister_service(info) #TODO
+        self.zeroconf.unregister_all_services()
         self.zeroconf.close()
 
 

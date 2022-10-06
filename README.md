@@ -22,23 +22,47 @@ pip install zeroconnect
 
 ## Usage
 
+### Most basic
+
+Service:
+```python
+def rxMessage(message, nodeId):
+    print(f"got message from {nodeId}")
+    print(message.decode("utf-8"))
+    #TODO Response or something
+    messageSock.sendMsg(b"Hello from server")
+    # Use messageSock.sock for e.g. sock.close()
+
+zc.advertise(rxMessage, "YOUR_SERVICE_ID_HERE")
+```
+
+Client:
+```python
+messageSock = ZeroConnect().zc.connectToFirst(SERVICE_ID)
+messageSock.sendMsg(b"Test message")
+data = messageSock.recvMsg()
+```
+
+### Less basic
+
 Service:
 ```python
 zc = ZeroConnect()
 
-def rxMessageConnection(messageSock, nodeId):
+def rxMessageConnection(messageSock, nodeId, serviceId):
     print(f"got message connection from {nodeId}")
     data = messageSock.recvMsg()
     print(data.decode("utf-8"))
     messageSock.sendMsg(b"Hello from server")
     # Use messageSock.sock for e.g. sock.close()
 
+#TODO Differentiate between msgCB and msgConnCB and rawConnCB.  Maybe use mode for all three?
 zc.advertise(rxMessageConnection, SERVICE_ID) # Implicit mode=SocketMode.Messages
 zc.advertise(rxMessageConnection, SERVICE_ID, NODE_ID) # Implicit mode=SocketMode.Messages
 
 # OR
 
-def rxRawConnection(sock, nodeId):
+def rxRawConnection(sock, nodeId, serviceId):
     print(f"got raw connection from {nodeId}")
     data = sock.recv(1024)
     print(data.decode("utf-8"))
@@ -47,9 +71,8 @@ def rxRawConnection(sock, nodeId):
 
 zc.advertise(rxRawConnection, SERVICE_ID, mode=SocketMode.Raw)
 zc.advertise(rxRawConnection, SERVICE_ID, NODE_ID, mode=SocketMode.Raw)
+zc.close()
 
-
-#TODO Shut down?
 #TODO Autoclose sockets?
 #TODO What happens when a connection dies?
 #TODO TEST THE EXAMPLES
@@ -87,4 +110,5 @@ data = messageSock.recvMsg()
 `zeroconnect` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
 
 ## TODO
-ignore self (?)
+ignore own service (?)
+async?
