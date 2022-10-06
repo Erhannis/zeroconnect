@@ -112,3 +112,4 @@ data = messageSock.recvMsg()
 ## TODO
 ignore own service (?)
 async?
+ssl

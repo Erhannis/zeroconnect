@@ -85,5 +85,21 @@ class FilterMap:
         for k in keys:
             del self.map[k]
 
+    def filterKeys(self, key):
+        """
+        Like getFilter, but returns a list of keys instead of values.
+        """
+        results = []
+        for k in self.map:
+            bad = False
+            for i in range(self.size):
+                if key[i] != None and k[i] != key[i]:
+                    bad = True
+                    break
+            if bad:
+                continue
+            results.append(k)
+        return results
+
     def __iter__(self):
         return self.map.__iter__()
