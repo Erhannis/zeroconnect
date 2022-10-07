@@ -28,7 +28,7 @@ def serviceToKey(serviceId):
     else:
         return f"_{serviceId}._http._tcp.local."
 
-def nodeToKey(self, nodeId):
+def nodeToKey(nodeId):
     if nodeId == None:
         return None
     else:
@@ -54,7 +54,7 @@ class SocketMode():
 class Ad(): # Man, this feels like LanCopy all over
     def fromInfo(info):
         """Like, the zc.get_service_info info"""
-        type_ = info.type_
+        type_ = info.type
         name = info.name
         addresses = tuple([socket.inet_ntoa(addr) for addr in info.addresses])
         port = info.port
@@ -132,7 +132,7 @@ class ZeroConnect:
             clientServiceId = messageSock.recvMsg().decode("utf-8") # Note that this might be empty
             if not clientNodeId and not clientServiceId:
                 # Connection was canceled (or was invalid)
-                print("connection canceled from {addr}")
+                print(f"connection canceled from {addr}")
                 messageSock.close()
                 return
             # The client might report different IDs than its service - is that problematic?
@@ -160,7 +160,7 @@ class ZeroConnect:
 
     def scan(self, serviceId=None, nodeId=None, time=30):
         """
-        Scans for `time` seconds, and returns matching services.  `[(type, name)]`\n
+        Scans for `time` seconds, and returns matching services.  `[Ad]`\n
         If `time` is zero, begin scanning (and DON'T STOP), and return previously discovered services.\n
         If `time` is negative, DON'T scan, and instead just return previously discovered services.
         """
@@ -175,7 +175,10 @@ class ZeroConnect:
             sleep(time)
             if time > 0:
                 browser.cancel()
-        return self.remoteAds.filterKeys((service_key, node_key))
+        ads = []
+        for aSet in self.remoteAds.getFilter((service_key, node_key)):
+            ads += list(aSet)
+        return ads
 
     def connectToFirst(self, serviceId=None, nodeId=None, mode=SocketMode.Messages, timeout=30):
         if serviceId == None and nodeId == None:
@@ -199,31 +202,42 @@ class ZeroConnect:
         sock = None
 
         def tryConnect(addr, port):
+            nonlocal sock
             localsock = client.connectOutbound(addr, port)
             lock.acquire()
-            if sock == None:
+            shouldClose = False
+            try:
                 messageSock = MessageSocket(localsock)
-                messageSock.sendMsg(self.localId) # I *think* both sides can send a message at once? #TODO Otherwise, add .swapMsg() or something
-                messageSock.sendMsg("")
-                clientNodeId = messageSock.recvMsg().decode("utf-8")
-                clientServiceId = messageSock.recvMsg().decode("utf-8") # Note that this might be empty
-                if not clientNodeId and not clientServiceId:
-                    # Connection was canceled (or was invalid)
-                    print("connection canceled from {addr}")
-                    messageSock.close()
+                if sock == None:
+                    messageSock.sendMsg(self.localId) # I *think* both sides can send a message at once? #TODO Otherwise, add .swapMsg() or something
+                    messageSock.sendMsg("")
+                    clientNodeId = messageSock.recvMsg().decode("utf-8")
+                    clientServiceId = messageSock.recvMsg().decode("utf-8") # Note that this might be empty
+                    if not clientNodeId and not clientServiceId:
+                        # Connection was canceled (or was invalid)
+                        print(f"connection canceled from {addr}")
+                        messageSock.close()
+                    else:
+                        # The client might report different IDs than its service - is that problematic?
+                        # ...Actually, clients don't need to have an advertised service in the first place.  So, no.
+                        if (clientNodeId, clientServiceId) not in self.outgoneConnections:
+                            self.outgoneConnections[(clientNodeId, clientServiceId)] = []
+                        self.outgoneConnections[(clientNodeId, clientServiceId)].append(messageSock)
+                        if mode == SocketMode.Raw:
+                            sock = localsock
+                        elif mode == SocketMode.Messages:
+                            sock = messageSock
                 else:
-                    # The client might report different IDs than its service - is that problematic?
-                    # ...Actually, clients don't need to have an advertised service in the first place.  So, no.
-                    if (clientNodeId, clientServiceId) not in self.incameConnections:
-                        self.incameConnections[(clientNodeId, clientServiceId)] = []
-                    self.incameConnections[(clientNodeId, clientServiceId)].append(messageSock)
-                    if mode == SocketMode.Raw:
-                        sock = localsock
-                    elif mode == SocketMode.Messages:
-                        sock = messageSock
-            lock.release()
-            wg.done()
-            pass #TODO
+                    print(f"{addr} {port} Beaten to the punch; closing outgoing connection")
+                    messageSock.sendMsg("")
+                    messageSock.sendMsg("")
+                    shouldClose = True
+            finally:
+                lock.release()
+                wg.done() # I realize there's two more lines before we're done, but I don't want to risk an exception, and the caller doesn't care abt final closes, I think
+                if shouldClose:
+                    sleep(0.1) # If I close immediately after sending, the messages don't get through before the close.  Sigh.
+                    messageSock.close()
 
         for addr in ad.addresses:
             wg.add(1)
@@ -238,8 +252,12 @@ class ZeroConnect:
         #TODO Support broadcasting to NOT CONNECTED nodes?
         #TODO Error handling
         for connections in (self.incameConnections[(serviceId, nodeId)] + self.outgoneConnections[(serviceId, nodeId)]):
-            for connection in connections:
-                connection.sendMsg(message) #TODO Remove failed/closed connections
+            for connection in list(connections):
+                try:
+                    connection.sendMsg(message) #TODO Remove failed/closed connections
+                except:
+                    print(f"A connection errored; removing: {connection}")
+                    connections.remove(connection)
 
     def close(self): #TODO Review
         self.zeroconf.unregister_all_services()

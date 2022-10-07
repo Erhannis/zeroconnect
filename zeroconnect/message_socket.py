@@ -27,7 +27,7 @@ class MessageSocket:
             return None
         length, = struct.unpack('!Q', lengthbuf)
         if length == 0:
-            return []
+            return b""
         else:
             return recvall(self.sock, length)
     
