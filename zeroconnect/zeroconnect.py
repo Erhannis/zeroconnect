@@ -6,11 +6,11 @@ from time import time as currentSeconds
 from zeroconf import IPVersion, ServiceBrowser, ServiceListener, Zeroconf, ServiceInfo
 from netifaces import interfaces, ifaddresses, AF_INET
 
-from message_socket import MessageSocket
-from utils.filter_map import FilterMap
-from utils.waitgroup import WaitGroup
-import server
-import client
+from .message_socket import MessageSocket
+from .utils.filter_map import FilterMap
+from .utils.waitgroup import WaitGroup
+from .server import listen
+from .client import connectOutbound
 
 # https://stackoverflow.com/a/166591/513038
 def getAddresses(): #TODO IPv6?
@@ -178,7 +178,7 @@ class ZeroConnect:
             elif mode == SocketMode.Messages:
                 callback(messageSock, clientNodeId, clientServiceId)
 
-        port = server.listen(socketCallback, port, host) #TODO Multiple interfaces?
+        port = listen(socketCallback, port, host) #TODO Multiple interfaces?
 
         service_string = serviceToKey(serviceId)
         node_string = nodeToKey(self.localId)
@@ -340,7 +340,7 @@ class ZeroConnect:
 
         def tryConnect(addr, port):
             nonlocal sock
-            localsock = client.connectOutbound(addr, port)
+            localsock = connectOutbound(addr, port)
             if localsock == None:
                 return
             lock.acquire()
