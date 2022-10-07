@@ -125,15 +125,15 @@ class ZeroConnect:
         """
         Advertise a service, and send new connections to `callback`.\n
         `callback` is called on its own (daemon) thread.  If you want to loop forever, go for it. #TODO If switch to single-message, no longer true\n
-        Only one node should advertise a given (serviceId, nodeId) pair at once, and that node\n
-        should only advertise it once at a time.  Doing otherwise may result in nasal demons.
+        Be warned that you should only have one adveristement running (locally?) with a given name - zeroconf
+        throws an exception otherwise.
         """
         if serviceId == None:
             raise Exception("serviceId required for advertising") #TODO Have an ugly default?
         
         def socketCallback(sock, addr):
             messageSock = MessageSocket(sock)
-            messageSock.sendMsg(self.localId) # I *think* both sides can send a message at once? #TODO Otherwise, add .swapMsg() or something
+            messageSock.sendMsg(self.localId) # It appears both sides can send a message at the same time.  Different comms may give different results, though.
             messageSock.sendMsg(serviceId)
             clientNodeId = messageSock.recvMsg().decode("utf-8")
             clientServiceId = messageSock.recvMsg().decode("utf-8") # Note that this might be empty
@@ -256,7 +256,7 @@ class ZeroConnect:
             if time > 0:
                 browser.cancel()
 
-    def connectToFirst(self, serviceId=None, nodeId=None, mode=SocketMode.Messages, timeout=30):
+    def connectToFirst(self, serviceId=None, nodeId=None, localServiceId="", mode=SocketMode.Messages, timeout=30):
         """
         Scan for anything that matches the IDs, try to connect to them all, and return the first
         one that succeeds.\n
@@ -273,7 +273,7 @@ class ZeroConnect:
 
         def tryConnect(ad):
             nonlocal sock
-            localsock = self.connect(ad, mode, timeout)
+            localsock = self.connect(ad, localServiceId, mode, timeout)
             if localsock == None:
                 return
             lock.acquire()
@@ -296,7 +296,7 @@ class ZeroConnect:
 
         return sock
     
-    def connect(self, ad, mode=SocketMode.Messages, timeout=30): #TODO "connectToNode"?
+    def connect(self, ad, localServiceId="", mode=SocketMode.Messages, timeout=30): #TODO "connectToNode"?
         """
         Attempts to connect to every address in the ad, but only uses the first success, and closes the rest.\n
         \n
@@ -318,8 +318,8 @@ class ZeroConnect:
             try:
                 messageSock = MessageSocket(localsock)
                 if sock == None:
-                    messageSock.sendMsg(self.localId) # I *think* both sides can send a message at once? #TODO Otherwise, add .swapMsg() or something
-                    messageSock.sendMsg("")
+                    messageSock.sendMsg(self.localId) # It appears both sides can send a message at the same time.  Different comms may give different results, though.
+                    messageSock.sendMsg(localServiceId)
                     clientNodeId = messageSock.recvMsg().decode("utf-8")
                     clientServiceId = messageSock.recvMsg().decode("utf-8") # Note that this might be empty
                     if not clientNodeId and not clientServiceId:
@@ -365,6 +365,15 @@ class ZeroConnect:
                 except:
                     print(f"A connection errored; removing: {connection}")
                     connections.remove(connection)
+
+    def getConnections(self):
+        cons = {}
+        cons.update(self.incameConnections)
+        for key in self.outgoneConnections:
+            if key not in cons:
+                cons[key] = []
+            cons[key] += self.outgoneConnections.getExact(key)
+        return cons
 
     def close(self):
         """

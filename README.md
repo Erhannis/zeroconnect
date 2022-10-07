@@ -110,9 +110,13 @@ data = messageSock.recvMsg()
 `zeroconnect` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
 
 ## TODO
-ignore own service (?)
 async?
 ssl
 remove extra prints
-publish
+publish package
 lower timeouts?
+connect to all, forever?
+logging level
+    hide errors
+        threads, I guess
+        particularly in connections
