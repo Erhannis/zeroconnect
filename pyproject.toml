@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zeroconnect"
-description = ''
+description = 'Use zeroconf to automatically connect devices via TCP on a LAN'
 readme = "README.md"
 requires-python = ">=3.7"
 license = "MIT"
-keywords = []
+keywords = [zeroconf, automatic, connect, mesh, network, iot, tcp]
 authors = [
   { name = "Erhannis Kirran", email = "eyeillus@gmail.com" },
 ]
@@ -23,13 +23,16 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
+dependencies = [
+  "netifaces",
+  "zeroconf"
+]
 dynamic = ["version"]
 
 [project.urls]
-Documentation = "https://github.com/unknown/zeroconnect#readme"
-Issues = "https://github.com/unknown/zeroconnect/issues"
-Source = "https://github.com/unknown/zeroconnect"
+Documentation = "https://github.com/erhannis/zeroconnect#readme"
+Issues = "https://github.com/erhannis/zeroconnect/issues"
+Source = "https://github.com/erhannis/zeroconnect"
 
 [tool.hatch.version]
 path = "zeroconnect/__about__.py"

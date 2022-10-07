@@ -3,7 +3,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/zeroconnect.svg)](https://pypi.org/project/zeroconnect)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/zeroconnect.svg)](https://pypi.org/project/zeroconnect)
 
-Use zeroconf to automatically connect devices on a network.
+Use zeroconf to automatically connect devices via TCP on a LAN.
 I can hardly believe this doesn't exist already, but after searching for an hour, in despair I resign myself to write my own, and patch the glaring hole in existence.
 
 -----
@@ -193,3 +193,4 @@ logging level
     hide errors
         threads, I guess
         particularly in connections
+maybe some automated tests?

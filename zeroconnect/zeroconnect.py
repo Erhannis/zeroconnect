@@ -1,6 +1,3 @@
-from audioop import add
-from platform import node
-from sqlite3 import connect
 import uuid
 import socket
 import threading
