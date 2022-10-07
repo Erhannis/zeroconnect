@@ -59,6 +59,7 @@ zc = ZeroConnect("NODE_ID")
 
 def rxMessageConnection(messageSock, nodeId, serviceId):
     print(f"got message connection from {nodeId}")
+    # If you also want to spontaneously send messages, pass the socket to e.g. another thread.
     while True:
         data = messageSock.recvMsg()
         print(data)
@@ -70,6 +71,10 @@ def rxMessageConnection(messageSock, nodeId, serviceId):
         elif data == b'marco':
             messageSock.sendMsg(b'polo')
             print(f"PING PONGED")
+        elif data == None:
+            print(f"Connection closed from {nodeId}")
+            messageSock.close()
+            return
         else:
             print(f"Unhandled message: {data}")
         # Use messageSock.sock for e.g. sock.getsockname()
@@ -88,7 +93,7 @@ Client:
 from zeroconnect import ZeroConnect, SocketMode
 
 SERVICE_ID = "YOUR_SERVICE_ID_HERE"
-zc = ZeroConnect("NODE_ID")
+zc = ZeroConnect("NODE_ID") # Technically the nodeId is optional; it'll assign you a random UUID
 
 ads = zc.scan(SERVICE_ID, time=5)
 # OR: ads = zc.scan(SERVICE_ID, NODE_ID)
@@ -138,7 +143,7 @@ Client:
 from zeroconnect import ZeroConnect, SocketMode
 
 SERVICE_ID = "YOUR_SERVICE_ID_HERE"
-zc = ZeroConnect("NODE_ID")
+zc = ZeroConnect("NODE_ID") # Technically the nodeId is optional; it'll assign you a random UUID
 
 ads = zc.scan(SERVICE_ID, time=5)
 # OR: ads = zc.scan(SERVICE_ID, NODE_ID)
@@ -181,6 +186,10 @@ However, you CAN have them send at the same time (at least according to my tests
 read the data in the fields.
 
 Note that some computers/networks block zeroconf, or external connection attempts, etc.
+
+Calling `broadcast` will automatically clean up dead connections.
+
+If you close your socket immediately after sending a message, the data may not finish sending.  Not my fault; blame socket.
 
 ## License
 
