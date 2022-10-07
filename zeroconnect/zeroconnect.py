@@ -51,9 +51,11 @@ class DelegateListener(ServiceListener):
 class SocketMode():
     Raw = 1
     Messages = 2
-    #TODO one-by-one message callback mode?
 
 class Ad(): # Man, this feels like LanCopy all over
+    """
+    Represents a node's zeroconf advertisement.
+    """
     def fromInfo(info):
         """Like, the zc.get_service_info info"""
         type_ = info.type
@@ -89,8 +91,33 @@ class Ad(): # Man, this feels like LanCopy all over
 
 #TODO Note: I'm not sure there aren't any race conditions in this.  I've been writing in Dart's strict threading model for months, and it took me a while to remember that race conditions exist
 class ZeroConnect:
+    """
+    Uses zeroconf to automatically connect devices on a network.\n
+    Here's some basic examples; check the README or source code for further info.
+    
+    Service:
+    ```python
+    from zeroconnect import ZeroConnect
+
+    def rxMessageConnection(messageSock, nodeId, serviceId):
+        print(f"got message connection from {nodeId}")
+        data = messageSock.recvMsg()
+        print(data)
+        messageSock.sendMsg(b"Hello from server")
+
+    ZeroConnect().advertise(rxMessageConnection, "YOUR_SERVICE_ID_HERE")
+    ```
+    
+    Client:
+    ```python
+    from zeroconnect import ZeroConnect
+    messageSock = ZeroConnect().connectToFirst("YOUR_SERVICE_ID_HERE")
+    messageSock.sendMsg(b"Test message")
+    data = messageSock.recvMsg()
+    ```
+    """
+
     def __init__(self, localId=None):
-        #TODO Make these private?
         self.zeroconf = Zeroconf(ip_version=IPVersion.V4Only) #TODO All IPv?
         if localId == None:
             localId = str(uuid.uuid4())
@@ -104,10 +131,11 @@ class ZeroConnect:
     def __update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
         print(f"Service {name} updated, service info: {info}")
-        ad = Ad.fromInfo(info)
-        if ad not in self.localAds:
-            self.remoteAds[ad.getKey()] = set()
-        self.remoteAds[ad.getKey()].add(ad) # Not even sure this is correct.  Should I remove the old record?  CAN I?
+        if info != None:
+            ad = Ad.fromInfo(info)
+            if ad not in self.localAds:
+                self.remoteAds[ad.getKey()] = set()
+            self.remoteAds[ad.getKey()].add(ad) # Not even sure this is correct.  Should I remove the old record?  CAN I?
         #TODO Anything else?
 
     def __remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
@@ -116,17 +144,18 @@ class ZeroConnect:
     def __add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
         print(f"Service {name} added, service info: {info}")
-        ad = Ad.fromInfo(info)
-        if ad not in self.localAds:
-            self.remoteAds[ad.getKey()] = set()
-        self.remoteAds[ad.getKey()].add(ad)
+        if info != None:
+            ad = Ad.fromInfo(info)
+            if ad not in self.localAds:
+                self.remoteAds[ad.getKey()] = set()
+            self.remoteAds[ad.getKey()].add(ad)
 
     def advertise(self, callback, serviceId, port=0, host="0.0.0.0", mode=SocketMode.Messages):
         """
         Advertise a service, and send new connections to `callback`.\n
-        `callback` is called on its own (daemon) thread.  If you want to loop forever, go for it. #TODO If switch to single-message, no longer true\n
+        `callback` is called on its own (daemon) thread.  If you want to loop forever, go for it.
         Be warned that you should only have one adveristement running (locally?) with a given name - zeroconf
-        throws an exception otherwise.
+        throws an exception otherwise.  However, if you create another ZeroConnect with a different name, it works fine.
         """
         if serviceId == None:
             raise Exception("serviceId required for advertising") #TODO Have an ugly default?
@@ -213,12 +242,13 @@ class ZeroConnect:
                 def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
                     info = zc.get_service_info(type_, name)
                     print(f"0Service {name} updated, service info: {info}")
-                    ad = Ad.fromInfo(info)
-                    lock.acquire()
-                    if ad not in totalAds:
-                        totalAds.add(ad)
-                        newAds.append(ad)
-                    lock.release()
+                    if info != None:
+                        ad = Ad.fromInfo(info)
+                        lock.acquire()
+                        if ad not in totalAds:
+                            totalAds.add(ad)
+                            newAds.append(ad)
+                        lock.release()
                     self.delegate.update_service(zc, type_, name)
 
                 def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
@@ -228,12 +258,13 @@ class ZeroConnect:
                 def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
                     info = zc.get_service_info(type_, name)
                     print(f"0Service {name} added, service info: {info}")
-                    ad = Ad.fromInfo(info)
-                    lock.acquire()
-                    if ad not in totalAds:
-                        totalAds.add(ad)
-                        newAds.append(ad)
-                    lock.release()
+                    if info != None:
+                        ad = Ad.fromInfo(info)
+                        lock.acquire()
+                        if ad not in totalAds:
+                            totalAds.add(ad)
+                            newAds.append(ad)
+                        lock.release()
                     self.delegate.add_service(zc, type_, name)
                 
             localListener = LocalListener(self.zcListener)
@@ -273,7 +304,7 @@ class ZeroConnect:
 
         def tryConnect(ad):
             nonlocal sock
-            localsock = self.connect(ad, localServiceId, mode, timeout)
+            localsock = self.connect(ad, localServiceId, mode)
             if localsock == None:
                 return
             lock.acquire()
@@ -296,13 +327,15 @@ class ZeroConnect:
 
         return sock
     
-    def connect(self, ad, localServiceId="", mode=SocketMode.Messages, timeout=30): #TODO "connectToNode"?
+    def connect(self, ad, localServiceId="", mode=SocketMode.Messages):
         """
         Attempts to connect to every address in the ad, but only uses the first success, and closes the rest.\n
         \n
         Returns a raw socket, or message socket, according to mode.\n
         If no connection succeeded, returns None.\n
-        Please close the socket once you're done with it.
+        Please close the socket once you're done with it.\n
+        \n
+        (localServiceId is a nicety, to optionally tell the server what service you're associated with.)
         """
         lock = threading.Lock()
         sockSet = threading.Event()
@@ -356,8 +389,9 @@ class ZeroConnect:
         return sock
 
     def broadcast(self, message, serviceId=None, nodeId=None):
-        """Send message to all existing connections (matching service/node filter)"""
-        #TODO Support broadcasting to NOT CONNECTED nodes?
+        """
+        Send message to all existing connections (matching service/node filter).
+        """
         for connections in (self.incameConnections[(serviceId, nodeId)] + self.outgoneConnections[(serviceId, nodeId)]):
             for connection in list(connections):
                 try:
@@ -367,6 +401,11 @@ class ZeroConnect:
                     connections.remove(connection)
 
     def getConnections(self):
+        """
+        Returns a map of `{(SERVICE, NODE) : [MESSAGE_SOCKET]}`.\n
+        If you need to distinguish between connections that came in and connections that went out, see
+        `incameConnections` and `outgoneConnections`.
+        """
         cons = {}
         cons.update(self.incameConnections)
         for key in self.outgoneConnections:

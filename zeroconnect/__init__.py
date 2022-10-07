@@ -2,4 +2,4 @@
 #
 # SPDX-License-Identifier: MIT
 
-from zeroconnect import ZeroConnect
+from zeroconnect import ZeroConnect, Ad
