@@ -31,7 +31,7 @@ def rxMessage(message, nodeId):
     print(message.decode("utf-8"))
     #TODO Response or something
     messageSock.sendMsg(b"Hello from server")
-    # Use messageSock.sock for e.g. sock.close()
+    # Use messageSock.sock for e.g. sock.getsockname()
 
 zc.advertise(rxMessage, "YOUR_SERVICE_ID_HERE")
 ```
@@ -55,7 +55,7 @@ def rxMessageConnection(messageSock, nodeId, serviceId):
     data = messageSock.recvMsg()
     print(data.decode("utf-8"))
     messageSock.sendMsg(b"Hello from server")
-    # Use messageSock.sock for e.g. sock.close()
+    # Use messageSock.sock for e.g. sock.getsockname()
 
 #TODO Differentiate between msgCB and msgConnCB and rawConnCB.  Maybe use mode for all three?
 zc.advertise(rxMessageConnection, SERVICE_ID) # Implicit mode=SocketMode.Messages
@@ -90,13 +90,13 @@ zc = ZeroConnect()
 #TODO Consider errors
 #TODO Organize cases better
 #TODO Callback for node discovery?
-nodes = zc.scan(SERVICE_ID)
-nodes = zc.scan(SERVICE_ID, NODE_ID) #TODO Timeout?
+ads = zc.scan(SERVICE_ID)
+ads = zc.scan(SERVICE_ID, NODE_ID) #TODO Timeout?
 messageSock = zc.connectToFirst(SERVICE_ID)
 messageSock = zc.connectToFirst(SERVICE_ID, NODE_ID)
 
-messageSock = zc.connect(nodes[0], mode=SocketMode.Messages) # Send and receive messages; the default mode
-sock = zc.connect(nodes[0], mode=SocketMode.Raw) # Get the raw streams
+messageSock = zc.connect(ads[0], mode=SocketMode.Messages) # Send and receive messages; the default mode
+sock = zc.connect(ads[0], mode=SocketMode.Raw) # Get the raw streams
 
 sock.sendall(b"Test message")
 data = sock.recv(1024)
@@ -114,3 +114,4 @@ data = messageSock.recvMsg()
 ignore own service (?)
 async?
 ssl
+remove extra prints
