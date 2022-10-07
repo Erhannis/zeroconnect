@@ -23,6 +23,8 @@ pip install zeroconnect
 
 ## Usage
 
+One or more servers, and one or more clients, run connected to the same LAN.  (Wifi or ethernet.)
+
 ### Most basic
 
 Service:
@@ -178,6 +180,8 @@ However, you CAN have them send at the same time (at least according to my tests
 `ZeroConnect` is intended to be manipulated via its methods, but it probably won't immediately explode if you
 read the data in the fields.
 
+Note that some computers/networks block zeroconf, or external connection attempts, etc.
+
 ## License
 
 `zeroconnect` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
@@ -194,3 +198,4 @@ logging level
         threads, I guess
         particularly in connections
 maybe some automated tests?
+.advertiseSingle to get one connection?  for quick stuff?
