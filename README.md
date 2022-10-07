@@ -26,7 +26,7 @@ pip install zeroconnect
 
 Service:
 ```python
-def rxMessage(message, nodeId):
+def rxMessage(message, nodeId): #TODO Not yet real
     print(f"got message from {nodeId}: {message}")
     #TODO Response or something
     messageSock.sendMsg(b"Hello from server")

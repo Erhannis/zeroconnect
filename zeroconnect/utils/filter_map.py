@@ -66,8 +66,7 @@ class FilterMap:
 
     def __delitem__(self, key):
         """
-        Deletes key.  Exact match.
-        #TODO Permit filter delete?
+        Deletes key.  Exact match.  See `delFilter`.
         """
         del self.map[key]
 

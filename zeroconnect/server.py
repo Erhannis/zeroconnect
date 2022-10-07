@@ -3,7 +3,6 @@ import threading
 
 def onNewClient(sock, addr, callback):
     callback(sock, addr)
-    #sock.close()
 
 def listenForConnections(s, callback):
     while True:

@@ -1,5 +1,6 @@
 from audioop import add
 from platform import node
+from sqlite3 import connect
 import uuid
 import socket
 import threading
@@ -79,8 +80,12 @@ class Ad(): # Man, this feels like LanCopy all over
 
     def __eq__(self, other):
         return self.type_ == other.type_ and self.name == other.name and self.addresses == other.addresses and self.port == other.port and self.serviceId == other.serviceId and self.nodeId == other.nodeId
-    
-    #TODO toString
+
+    def __str__(self):
+        return f"Ad('{self.type_}','{self.name}',{self.addresses},{self.port},'{self.serviceId}','{self.nodeId}')"
+
+    def __repr__(self):
+        return self.__str__()
 
 #TODO Note: I'm not sure there aren't any race conditions in this.  I've been writing in Dart's strict threading model for months, and it took me a while to remember that race conditions exist
 class ZeroConnect:
@@ -92,7 +97,7 @@ class ZeroConnect:
         self.localId = localId
         self.zcListener = DelegateListener(self.__update_service, self.__remove_service, self.__add_service)
         self.localAds = set() # set{Ad}
-        self.remoteAds = FilterMap(2) # (type_, name) = set{Ad} #TODO Should we even PERMIT multiple ads per keypair? #TODO (service,node) instead?
+        self.remoteAds = FilterMap(2) # (type_, name) = set{Ad} #TODO Should we even PERMIT multiple ads per keypair?
         self.incameConnections = FilterMap(2) # (service, node) = list[messageSocket]
         self.outgoneConnections = FilterMap(2) # (service, node) = list[messageSocket]
 
@@ -147,7 +152,7 @@ class ZeroConnect:
             elif mode == SocketMode.Messages:
                 callback(messageSock, clientNodeId, clientServiceId)
 
-        port = server.listen(socketCallback, port, host) #TODO #TODO Also, multiple interfaces?
+        port = server.listen(socketCallback, port, host) #TODO Multiple interfaces?
 
         service_string = serviceToKey(serviceId)
         node_string = nodeToKey(self.localId)
@@ -255,6 +260,7 @@ class ZeroConnect:
         """
         Scan for anything that matches the IDs, try to connect to them all, and return the first
         one that succeeds.\n
+        Note that this may leave extraneous dead connections in `outgoneConnections`!\n
         Returns `(sock, Ad)`, or None if the timeout expires first.\n
         If timeout == -1, don't scan, only use cached services.
         """
@@ -262,17 +268,33 @@ class ZeroConnect:
             raise Exception("Must have at least one id")
 
         lock = threading.Lock()
-        wg = WaitGroup()
+        sockSet = threading.Event()
         sock = None
 
         def tryConnect(ad):
             nonlocal sock
+            localsock = self.connect(ad, mode, timeout)
+            if localsock == None:
+                return
+            lock.acquire()
+            try:
+                if sock == None:
+                    sock = localsock
+                    sockSet.set()
+                else:
+                    localsock.close()
+            finally:
+                lock.release()
 
+        def startScanning():
+            for ad in self.scanGen(serviceId, nodeId, timeout):
+                threading.Thread(target=tryConnect, args=(ad,), daemon=True).start()
+        
+        threading.Thread(target=startScanning, args=(), daemon=True).start() # Otherwise it blocks until timeout regardless of success
 
-        for ad in self.scanGen(serviceId, nodeId, timeout):
-            pass #TODO
+        sockSet.wait(timeout) # Note that this doesn't wait for the threads to finish.  I *think* that's ok.
 
-        pass #TODO
+        return sock
     
     def connect(self, ad, mode=SocketMode.Messages, timeout=30): #TODO "connectToNode"?
         """
@@ -283,12 +305,14 @@ class ZeroConnect:
         Please close the socket once you're done with it.
         """
         lock = threading.Lock()
-        wg = WaitGroup()
+        sockSet = threading.Event()
         sock = None
 
         def tryConnect(addr, port):
             nonlocal sock
             localsock = client.connectOutbound(addr, port)
+            if localsock == None:
+                return
             lock.acquire()
             shouldClose = False
             try:
@@ -312,6 +336,7 @@ class ZeroConnect:
                             sock = localsock
                         elif mode == SocketMode.Messages:
                             sock = messageSock
+                        sockSet.set()
                 else:
                     print(f"{addr} {port} Beaten to the punch; closing outgoing connection")
                     messageSock.sendMsg("")
@@ -319,32 +344,32 @@ class ZeroConnect:
                     shouldClose = True
             finally:
                 lock.release()
-                wg.done() # I realize there's two more lines before we're done, but I don't want to risk an exception, and the caller doesn't care abt final closes, I think
                 if shouldClose:
                     sleep(0.1) # If I close immediately after sending, the messages don't get through before the close.  Sigh.
                     messageSock.close()
 
         for addr in ad.addresses:
-            wg.add(1)
             threading.Thread(target=tryConnect, args=(addr, ad.port), daemon=True).start()
 
-        wg.wait()
+        sockSet.wait() # Note that this doesn't wait for the threads to finish.  I *think* that's ok.
 
         return sock
 
     def broadcast(self, message, serviceId=None, nodeId=None):
         """Send message to all existing connections (matching service/node filter)"""
         #TODO Support broadcasting to NOT CONNECTED nodes?
-        #TODO Error handling
         for connections in (self.incameConnections[(serviceId, nodeId)] + self.outgoneConnections[(serviceId, nodeId)]):
             for connection in list(connections):
                 try:
-                    connection.sendMsg(message) #TODO Remove failed/closed connections
+                    connection.sendMsg(message)
                 except:
                     print(f"A connection errored; removing: {connection}")
                     connections.remove(connection)
 
-    def close(self): #TODO Review
+    def close(self):
+        """
+        Unregisters and closes zeroconf, and closes all connections.
+        """
         try:
             self.zeroconf.unregister_all_services()
         except:
