@@ -1,10 +1,5 @@
-#!/usr/bin/python           # This is server.py file                                                                                                                                                                           
-
-import socket               # Import socket module
+import socket
 import threading
-import random
-
-id = random.uniform(0,1)
 
 def onNewClient(sock, addr, callback):
     callback(sock, addr)
@@ -12,9 +7,9 @@ def onNewClient(sock, addr, callback):
 
 def listenForConnections(s, callback):
     while True:
-        c, addr = s.accept()     # Establish connection with client.
+        sock, addr = s.accept()
         print('Got connection from', addr)
-        threading.Thread(target=onNewClient, args=(c, addr, callback), daemon=True).start()
+        threading.Thread(target=onNewClient, args=(sock, addr, callback), daemon=True).start()
     s.close()
 
 def listen(callback, port=0, host="0.0.0.0"):

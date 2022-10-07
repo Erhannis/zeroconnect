@@ -27,8 +27,7 @@ pip install zeroconnect
 Service:
 ```python
 def rxMessage(message, nodeId):
-    print(f"got message from {nodeId}")
-    print(message.decode("utf-8"))
+    print(f"got message from {nodeId}: {message}")
     #TODO Response or something
     messageSock.sendMsg(b"Hello from server")
     # Use messageSock.sock for e.g. sock.getsockname()
@@ -53,7 +52,7 @@ zc = ZeroConnect()
 def rxMessageConnection(messageSock, nodeId, serviceId):
     print(f"got message connection from {nodeId}")
     data = messageSock.recvMsg()
-    print(data.decode("utf-8"))
+    print(data)
     messageSock.sendMsg(b"Hello from server")
     # Use messageSock.sock for e.g. sock.getsockname()
 
@@ -66,7 +65,7 @@ zc.advertise(rxMessageConnection, SERVICE_ID, NODE_ID) # Implicit mode=SocketMod
 def rxRawConnection(sock, nodeId, serviceId):
     print(f"got raw connection from {nodeId}")
     data = sock.recv(1024)
-    print(data.decode("utf-8"))
+    print(data)
     sock.sendall(b"Hello from server")
     # sock is a plain socket; use accordingly
 

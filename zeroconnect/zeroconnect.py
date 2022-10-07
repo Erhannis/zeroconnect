@@ -4,6 +4,7 @@ import uuid
 import socket
 import threading
 from time import sleep
+from time import time as currentSeconds
 from zeroconf import IPVersion, ServiceBrowser, ServiceListener, Zeroconf, ServiceInfo
 from netifaces import interfaces, ifaddresses, AF_INET
 
@@ -81,6 +82,7 @@ class Ad(): # Man, this feels like LanCopy all over
     
     #TODO toString
 
+#TODO Note: I'm not sure there aren't any race conditions in this.  I've been writing in Dart's strict threading model for months, and it took me a while to remember that race conditions exist
 class ZeroConnect:
     def __init__(self, localId=None):
         #TODO Make these private?
@@ -91,8 +93,8 @@ class ZeroConnect:
         self.zcListener = DelegateListener(self.__update_service, self.__remove_service, self.__add_service)
         self.localAds = set() # set{Ad}
         self.remoteAds = FilterMap(2) # (type_, name) = set{Ad} #TODO Should we even PERMIT multiple ads per keypair? #TODO (service,node) instead?
-        self.incameConnections = FilterMap(2) # (service, node) = list[messageSocket] #TODO Should we even PERMIT multiple connections?
-        self.outgoneConnections = FilterMap(2) # (service, node) = list[messageSocket] #TODO Should we even PERMIT multiple connections? #TODO Associate Ad with sock?
+        self.incameConnections = FilterMap(2) # (service, node) = list[messageSocket]
+        self.outgoneConnections = FilterMap(2) # (service, node) = list[messageSocket]
 
     def __update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
@@ -116,9 +118,9 @@ class ZeroConnect:
 
     def advertise(self, callback, serviceId, port=0, host="0.0.0.0", mode=SocketMode.Messages):
         """
-        Advertise a service, and send new connections to `callback`.
-        `callback` is called on its own (daemon) thread.  If you want to loop forever, go for it. #TODO If switch to single-message, no longer true
-        Only one node should advertise a given (serviceId, nodeId) pair at once, and that node
+        Advertise a service, and send new connections to `callback`.\n
+        `callback` is called on its own (daemon) thread.  If you want to loop forever, go for it. #TODO If switch to single-message, no longer true\n
+        Only one node should advertise a given (serviceId, nodeId) pair at once, and that node\n
         should only advertise it once at a time.  Doing otherwise may result in nasal demons.
         """
         if serviceId == None:
@@ -180,23 +182,106 @@ class ZeroConnect:
             ads += list(aSet)
         return ads
 
+    def scanGen(self, serviceId=None, nodeId=None, time=30):
+        """
+        Generator version of `scan`.
+        """
+        browser = None
+        service_key = serviceToKey(serviceId)
+        node_key = nodeToKey(nodeId)
+
+        totalAds = set()
+
+        for aSet in self.remoteAds.getFilter((service_key, node_key)):
+            for ad in aSet:
+                totalAds.add(ad)
+                yield ad
+
+        if time >= 0:
+            lock = threading.Lock()
+            newAds = []
+
+            class LocalListener(ServiceListener):
+                def __init__(self, delegate):
+                    self.delegate = delegate
+            
+                def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
+                    info = zc.get_service_info(type_, name)
+                    print(f"0Service {name} updated, service info: {info}")
+                    ad = Ad.fromInfo(info)
+                    lock.acquire()
+                    if ad not in totalAds:
+                        totalAds.add(ad)
+                        newAds.append(ad)
+                    lock.release()
+                    self.delegate.update_service(zc, type_, name)
+
+                def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
+                    print(f"0Service {name} removed")
+                    self.delegate.remove_service(zc, type_, name)
+
+                def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
+                    info = zc.get_service_info(type_, name)
+                    print(f"0Service {name} added, service info: {info}")
+                    ad = Ad.fromInfo(info)
+                    lock.acquire()
+                    if ad not in totalAds:
+                        totalAds.add(ad)
+                        newAds.append(ad)
+                    lock.release()
+                    self.delegate.add_service(zc, type_, name)
+                
+            localListener = LocalListener(self.zcListener)
+
+            if serviceId == None:
+                browser = ServiceBrowser(self.zeroconf, f"_http._tcp.local.", localListener)
+            else:
+                browser = ServiceBrowser(self.zeroconf, service_key, localListener)
+            
+            endTime = currentSeconds() + time
+            while currentSeconds() < endTime:
+                sleep(0.5)
+                lock.acquire()
+                adCopy = list(newAds)
+                newAds.clear()
+                lock.release()
+                for ad in adCopy:
+                    yield ad
+
+            if time > 0:
+                browser.cancel()
+
     def connectToFirst(self, serviceId=None, nodeId=None, mode=SocketMode.Messages, timeout=30):
+        """
+        Scan for anything that matches the IDs, try to connect to them all, and return the first
+        one that succeeds.\n
+        Returns `(sock, Ad)`, or None if the timeout expires first.\n
+        If timeout == -1, don't scan, only use cached services.
+        """
         if serviceId == None and nodeId == None:
             raise Exception("Must have at least one id")
+
+        lock = threading.Lock()
+        wg = WaitGroup()
+        sock = None
+
+        def tryConnect(ad):
+            nonlocal sock
+
+
+        for ad in self.scanGen(serviceId, nodeId, timeout):
+            pass #TODO
+
         pass #TODO
     
     def connect(self, ad, mode=SocketMode.Messages, timeout=30): #TODO "connectToNode"?
         """
-        If timeout == -1, don't scan, only use cached services
-
-        Attempts to connect to every address in the ad, but only uses the first success, and closes the rest.
-
-        Returns a raw socket, or message socket, according to mode.
-        If no connection succeeded, returns None.
+        Attempts to connect to every address in the ad, but only uses the first success, and closes the rest.\n
+        \n
+        Returns a raw socket, or message socket, according to mode.\n
+        If no connection succeeded, returns None.\n
         Please close the socket once you're done with it.
         """
-        #self.remoteAds[keypair].__iter__().__next__()
-
         lock = threading.Lock()
         wg = WaitGroup()
         sock = None
@@ -260,7 +345,17 @@ class ZeroConnect:
                     connections.remove(connection)
 
     def close(self): #TODO Review
-        self.zeroconf.unregister_all_services()
-        self.zeroconf.close()
-
-
+        try:
+            self.zeroconf.unregister_all_services()
+        except:
+            print(f"An error occurred in zeroconf.unregister_all_services()")
+        try:
+            self.zeroconf.close()
+        except:
+            print(f"An error occurred in zeroconf.close()")
+        for connections in (self.incameConnections[(None,None)] + self.outgoneConnections[(None,None)]):
+            for connection in list(connections):
+                try:
+                    connection.close()
+                except:
+                    print(f"An error occurred closing connection {connection}")
