@@ -211,3 +211,4 @@ logging level
         particularly in connections
 maybe some automated tests?
 .advertiseSingle to get one connection?  for quick stuff?
+write up some differences between libraries; .local. and all

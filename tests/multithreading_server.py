@@ -2,7 +2,7 @@ from zeroconnect.utils.waitgroup import WaitGroup
 from zeroconnect import ZeroConnect
 import multithreading_common
 
-SERVICE_ID = "MT_TEST"
+SERVICE_ID = "MTTEST"
 
 zc = ZeroConnect("MT_TEST_SERVER")
 

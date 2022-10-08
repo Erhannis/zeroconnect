@@ -21,23 +21,29 @@ def getAddresses(): #TODO IPv6?
                 addresses.add(socket.inet_aton(i["addr"]))
     return addresses
 
+def serviceToType(serviceId):
+    if serviceId == None:
+        return "_tcp.local."
+    else:
+        return f"_{serviceId}._tcp.local."
+
 def serviceToKey(serviceId):
     if serviceId == None:
         return None
     else:
-        return f"_{serviceId}._http._tcp.local."
+        return f"_{serviceId}._tcp.local."
 
-def nodeToKey(nodeId):
+def nodeToKey(nodeId, serviceId):
     if nodeId == None:
         return None
     else:
-        return f"{nodeId}._http._tcp.local."
+        return f"_{nodeId}.{serviceToType(serviceId)}" #TODO Dang it, not sure this will work for no serviceId
 
 def typeToService(type_): # This is kindof horrible, and brittle, and MAY be subject to accidental bad data
-    return type_[len("_"):-len("._http._tcp.local.")]
+    return type_[len("_"):-len("._tcp.local.")]
 
-def nameToNode(name):
-    return name[len(""):-len("._http._tcp.local.")]
+def nameToNode(name, type_):
+    return name[len(""):-len(type_)]
 
 class DelegateListener(ServiceListener):
     def __init__(self, update_service, remove_service, add_service):
@@ -60,7 +66,7 @@ class Ad(): # Man, this feels like LanCopy all over
         addresses = tuple([socket.inet_ntoa(addr) for addr in info.addresses])
         port = info.port
         serviceId = typeToService(type_)
-        nodeId = nameToNode(name)
+        nodeId = nameToNode(name, type_)
         return Ad(type_, name, addresses, port, serviceId, nodeId)
 
     def __init__(self, type_, name, addresses, port, serviceId, nodeId):
@@ -181,7 +187,7 @@ class ZeroConnect:
         port = listen(socketCallback, port, host) #TODO Multiple interfaces?
 
         service_string = serviceToKey(serviceId)
-        node_string = nodeToKey(self.localId)
+        node_string = nodeToKey(self.localId, serviceId)
         info = ServiceInfo(
             service_string,
             node_string,
@@ -199,10 +205,10 @@ class ZeroConnect:
         """
         browser = None
         service_key = serviceToKey(serviceId)
-        node_key = nodeToKey(nodeId)
+        node_key = nodeToKey(nodeId, serviceId)
         if time >= 0:
             if serviceId == None:
-                browser = ServiceBrowser(self.zeroconf, f"_http._tcp.local.", self.zcListener)
+                browser = ServiceBrowser(self.zeroconf, f"_tcp.local.", self.zcListener)
             else:
                 browser = ServiceBrowser(self.zeroconf, service_key, self.zcListener)
             sleep(time)
@@ -219,7 +225,7 @@ class ZeroConnect:
         """
         browser = None
         service_key = serviceToKey(serviceId)
-        node_key = nodeToKey(nodeId)
+        node_key = nodeToKey(nodeId, serviceId)
 
         totalAds = set()
 
@@ -267,7 +273,7 @@ class ZeroConnect:
             localListener = LocalListener(self.zcListener)
 
             if serviceId == None:
-                browser = ServiceBrowser(self.zeroconf, f"_http._tcp.local.", localListener)
+                browser = ServiceBrowser(self.zeroconf, f"_tcp.local.", localListener)
             else:
                 browser = ServiceBrowser(self.zeroconf, service_key, localListener)
             
