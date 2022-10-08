@@ -191,6 +191,9 @@ Calling `broadcast` will automatically clean up dead connections.
 
 If you close your socket immediately after sending a message, the data may not finish sending.  Not my fault; blame socket.
 
+`broadcast` uses MessageSockets, so if you're using a raw socket, be aware the message will be prefixed with a header, currently
+an 8 byte unsigned long representing the length of the subsequent message.  See `MessageSocket`.
+
 ## License
 
 `zeroconnect` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
