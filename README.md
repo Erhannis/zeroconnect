@@ -46,6 +46,7 @@ from zeroconnect import ZeroConnect
 messageSock = ZeroConnect().connectToFirst("YOUR_SERVICE_ID_HERE")
 messageSock.sendMsg(b"Hello from client")
 data = messageSock.recvMsg()
+print(data)
 ```
 
 ### Less basic
@@ -193,6 +194,13 @@ If you close your socket immediately after sending a message, the data may not f
 
 `broadcast` uses MessageSockets, so if you're using a raw socket, be aware the message will be prefixed with a header, currently
 an 8 byte unsigned long representing the length of the subsequent message.  See `MessageSocket`.
+
+See logging.py to see logging settings, or do like so:
+```python
+from zeroconnect.logging import *
+setLogLevel(-1) # 4+ for everything current, -1 for nothing except uncaught exceptions
+# It also contains some presets; ERROR/WARN/INFO/VERBOSE/DEBUG atm.
+```
 
 ## License
 

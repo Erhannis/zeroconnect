@@ -1,21 +1,28 @@
 import socket
 import threading
+from .logging import *
 
 def onNewClient(sock, addr, callback):
-    callback(sock, addr)
+    try:
+        callback(sock, addr)
+    except Exception:
+        zerr(ERROR, f"An error occured in client-connection-handling code")
+        if ERROR <= getLogLevel():
+            raise
+        else:
+            return
 
 def listenForConnections(s, callback):
     while True:
         sock, addr = s.accept()
-        print('Got connection from', addr)
+        zlog(INFO, 'Got connection from', addr)
         threading.Thread(target=onNewClient, args=(sock, addr, callback), daemon=True).start()
     s.close()
 
 def listen(callback, port=0, host="0.0.0.0"):
     s = socket.socket()
 
-    print('Server started!')
-    print('Waiting for clients...')
+    zlog(WARN, 'Server started and listening for clients!')
 
     s.bind((host, port))
     port = s.getsockname()[1]

@@ -33,7 +33,7 @@ class MessageSocket:
             self.sendLock.release()
             pass
 
-    def recvMsg(self): #TODO readLock?
+    def recvMsg(self):
         """
         Result of [] simply means an empty message; result of None implies some kind of failure; likely a disconnect.
         """
@@ -43,7 +43,6 @@ class MessageSocket:
             if lengthbuf == None:
                 return None
             length, = struct.unpack('!Q', lengthbuf)
-            #print(f"RM len {length}")
             if length == 0:
                 return b""
             else:

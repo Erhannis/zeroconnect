@@ -11,6 +11,7 @@ from .utils.filter_map import FilterMap
 from .utils.waitgroup import WaitGroup
 from .server import listen
 from .client import connectOutbound
+from .logging import *
 
 # https://stackoverflow.com/a/166591/513038
 def getAddresses(): #TODO IPv6?
@@ -127,7 +128,7 @@ class ZeroConnect:
 
     def __update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
-        print(f"Service {name} updated, service info: {info}")
+        zlog(INFO, f"Service {name} updated, service info: {info}")
         if info != None:
             ad = Ad.fromInfo(info)
             if ad not in self.localAds:
@@ -136,11 +137,11 @@ class ZeroConnect:
         #TODO Anything else?
 
     def __remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-        print(f"Service {name} removed")
+        zlog(INFO, f"Service {name} removed")
 
     def __add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
-        print(f"Service {name} added, service info: {info}")
+        zlog(INFO, f"Service {name} added, service info: {info}")
         if info != None:
             ad = Ad.fromInfo(info)
             if ad not in self.localAds:
@@ -165,7 +166,7 @@ class ZeroConnect:
             clientServiceId = messageSock.recvMsg().decode("utf-8") # Note that this might be empty
             if not clientNodeId and not clientServiceId:
                 # Connection was canceled (or was invalid)
-                print(f"connection canceled from {addr}")
+                zlog(INFO, f"connection canceled from {addr}")
                 messageSock.close()
                 return
             # The client might report different IDs than its service - is that problematic?
@@ -238,7 +239,7 @@ class ZeroConnect:
             
                 def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
                     info = zc.get_service_info(type_, name)
-                    print(f"0Service {name} updated, service info: {info}")
+                    zlog(VERBOSE, f"0Service {name} updated, service info: {info}")
                     if info != None:
                         ad = Ad.fromInfo(info)
                         lock.acquire()
@@ -249,12 +250,12 @@ class ZeroConnect:
                     self.delegate.update_service(zc, type_, name)
 
                 def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-                    print(f"0Service {name} removed")
+                    zlog(VERBOSE, f"0Service {name} removed")
                     self.delegate.remove_service(zc, type_, name)
 
                 def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
                     info = zc.get_service_info(type_, name)
-                    print(f"0Service {name} added, service info: {info}")
+                    zlog(VERBOSE, f"0Service {name} added, service info: {info}")
                     if info != None:
                         ad = Ad.fromInfo(info)
                         lock.acquire()
@@ -354,7 +355,7 @@ class ZeroConnect:
                     clientServiceId = messageSock.recvMsg().decode("utf-8") # Note that this might be empty
                     if not clientNodeId and not clientServiceId:
                         # Connection was canceled (or was invalid)
-                        print(f"connection canceled from {addr}")
+                        zlog(INFO, f"connection canceled from {addr}")
                         messageSock.close()
                     else:
                         # The client might report different IDs than its service - is that problematic?
@@ -368,10 +369,17 @@ class ZeroConnect:
                             sock = messageSock
                         sockSet.set()
                 else:
-                    print(f"{addr} {port} Beaten to the punch; closing outgoing connection")
+                    zlog(INFO, f"{addr} {port} Beaten to the punch; closing outgoing connection")
                     messageSock.sendMsg("")
                     messageSock.sendMsg("")
                     shouldClose = True
+            except Exception:
+                zerr(WARN, f"An error occured in connection-forming code")
+                if WARN <= getLogLevel():
+                    print("raising")
+                    raise
+                else:
+                    return
             finally:
                 lock.release()
                 if shouldClose:
@@ -394,7 +402,7 @@ class ZeroConnect:
                 try:
                     connection.sendMsg(message)
                 except:
-                    print(f"A connection errored; removing: {connection}")
+                    zerr(WARN, f"A connection errored; removing: {connection}")
                     connections.remove(connection)
 
     def getConnections(self):
@@ -418,14 +426,14 @@ class ZeroConnect:
         try:
             self.zeroconf.unregister_all_services()
         except:
-            print(f"An error occurred in zeroconf.unregister_all_services()")
+            zerr(WARN, f"An error occurred in zeroconf.unregister_all_services()")
         try:
             self.zeroconf.close()
         except:
-            print(f"An error occurred in zeroconf.close()")
+            zerr(WARN, f"An error occurred in zeroconf.close()")
         for connections in (self.incameConnections[(None,None)] + self.outgoneConnections[(None,None)]):
             for connection in list(connections):
                 try:
                     connection.close()
                 except:
-                    print(f"An error occurred closing connection {connection}")
+                    zerr(WARN, f"An error occurred closing connection {connection}")
