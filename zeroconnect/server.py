@@ -13,7 +13,7 @@ def onNewClient(sock, addr, callback):
             return
 
 def listenForConnections(s, callback):
-    while True:
+    while True: #LEAK This never exits, there's no way to cancel the advertisement
         sock, addr = s.accept()
         zlog(INFO, 'Got connection from', addr)
         threading.Thread(target=onNewClient, args=(sock, addr, callback), daemon=True).start()

@@ -123,17 +123,19 @@ class ZeroConnect:
         self.zcListener = DelegateListener(self.__update_service, self.__remove_service, self.__add_service)
         self.localAds = set() # set{Ad}
         self.remoteAds = FilterMap(2) # (type_, name) = set{Ad} #TODO Should we even PERMIT multiple ads per keypair?
-        self.incameConnections = FilterMap(2) # (service, node) = list[messageSocket]
-        self.outgoneConnections = FilterMap(2) # (service, node) = list[messageSocket]
+        self.incameConnections = FilterMap(2) # (node, service) = list[messageSocket]
+        self.outgoneConnections = FilterMap(2) # (node, service) = list[messageSocket]
 
     def __update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
         zlog(INFO, f"Service {name} updated, service info: {info}")
         if info != None:
             ad = Ad.fromInfo(info)
+            #THINK SHOULD we ignore anything in localAds?
             if ad not in self.localAds:
-                self.remoteAds[ad.getKey()] = set()
-            self.remoteAds[ad.getKey()].add(ad) # Not even sure this is correct.  Should I remove the old record?  CAN I?
+                if ad not in self.remoteAds:
+                    self.remoteAds[ad.getKey()] = set()
+                self.remoteAds[ad.getKey()].add(ad) # Not even sure this is correct.  Should I remove the old record?  CAN I?
         #TODO Anything else?
 
     def __remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
@@ -144,9 +146,11 @@ class ZeroConnect:
         zlog(INFO, f"Service {name} added, service info: {info}")
         if info != None:
             ad = Ad.fromInfo(info)
+            #THINK SHOULD we ignore anything in localAds?
             if ad not in self.localAds:
-                self.remoteAds[ad.getKey()] = set()
-            self.remoteAds[ad.getKey()].add(ad)
+                if ad not in self.remoteAds:
+                    self.remoteAds[ad.getKey()] = set()
+                self.remoteAds[ad.getKey()].add(ad)
 
     def advertise(self, callback, serviceId, port=0, host="0.0.0.0", mode=SocketMode.Messages):
         """
@@ -397,7 +401,7 @@ class ZeroConnect:
         """
         Send message to all existing connections (matching service/node filter).
         """
-        for connections in (self.incameConnections[(serviceId, nodeId)] + self.outgoneConnections[(serviceId, nodeId)]):
+        for connections in (self.incameConnections.getFilter((nodeId, serviceId)) + self.outgoneConnections.getFilter((nodeId, serviceId))):
             for connection in list(connections):
                 try:
                     connection.sendMsg(message)

@@ -164,7 +164,7 @@ zc.close()
 ```
 
 There's a few other functions you might find useful.  Look at the source code.
-Here; I'll paste the declaration of all the public `ZeroConf` methods here.
+Here; I'll paste the declaration of all the public `ZeroConnect` methods here.
 
 ```python
     def __init__(self, localId=None):

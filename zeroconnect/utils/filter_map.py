@@ -102,3 +102,6 @@ class FilterMap:
 
     def __iter__(self):
         return self.map.__iter__()
+    
+    def clear(self):
+        self.map.clear()
