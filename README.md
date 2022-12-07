@@ -14,6 +14,7 @@ I can hardly believe this doesn't exist already, but after searching for an hour
 - [Usage](#usage)
 - [License](#license)
 - [Tips](#tips)
+- [Bonus!](#bonus)
 
 ## Installation
 
@@ -200,7 +201,23 @@ See logging.py to see logging settings, or do like so:
 from zeroconnect.logging import *
 setLogLevel(-1) # 4+ for everything current, -1 for nothing except uncaught exceptions
 # It also contains some presets; ERROR/WARN/INFO/VERBOSE/DEBUG atm.
+# Also, you can move all the logging to stderr with `setLogType(2)`.
 ```
+
+## Bonus!
+
+Also includes zcat, like ncat/nc/netcat.  Use as follows:
+
+RX:
+```bash
+python -m zeroconnect.zcat -l SERVICE_ID [NODE_ID] > FILE
+```
+
+TX:
+```bash
+cat FILE | python -m zeroconnect.zcat SERVICE_ID [NODE_ID]
+```
+
 
 ## License
 
@@ -208,14 +225,8 @@ setLogLevel(-1) # 4+ for everything current, -1 for nothing except uncaught exce
 
 ## TODO
 ssl
-remove extra prints
-publish package
 lower timeouts?
 connect to all, forever?
     connection callback
-logging level
-    hide errors
-        threads, I guess
-        particularly in connections
 maybe some automated tests?
 .advertiseSingle to get one connection?  for quick stuff?

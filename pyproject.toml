@@ -25,7 +25,8 @@ classifiers = [
 ]
 dependencies = [
   "netifaces",
-  "zeroconf"
+  "zeroconf",
+  "argparse"
 ]
 dynamic = ["version"]
 

@@ -133,7 +133,12 @@ class ZeroConnect:
             ad = Ad.fromInfo(info)
             #THINK SHOULD we ignore anything in localAds?
             if ad not in self.localAds:
-                if ad not in self.remoteAds:
+                has = False
+                for s in self.remoteAds.map.values():
+                    if ad in s:
+                        has = True
+                        break
+                if not has:
                     self.remoteAds[ad.getKey()] = set()
                 self.remoteAds[ad.getKey()].add(ad) # Not even sure this is correct.  Should I remove the old record?  CAN I?
         #TODO Anything else?
@@ -148,7 +153,12 @@ class ZeroConnect:
             ad = Ad.fromInfo(info)
             #THINK SHOULD we ignore anything in localAds?
             if ad not in self.localAds:
-                if ad not in self.remoteAds:
+                has = False
+                for s in self.remoteAds.map.values():
+                    if ad in s:
+                        has = True
+                        break
+                if not has:
                     self.remoteAds[ad.getKey()] = set()
                 self.remoteAds[ad.getKey()].add(ad)
 
@@ -246,6 +256,8 @@ class ZeroConnect:
                     zlog(VERBOSE, f"0Service {name} updated, service info: {info}")
                     if info != None:
                         ad = Ad.fromInfo(info)
+                        if node_key and ad.getKey()[1] != node_key:
+                            return
                         lock.acquire()
                         if ad not in totalAds:
                             totalAds.add(ad)
@@ -262,6 +274,8 @@ class ZeroConnect:
                     zlog(VERBOSE, f"0Service {name} added, service info: {info}")
                     if info != None:
                         ad = Ad.fromInfo(info)
+                        if node_key and ad.getKey()[1] != node_key:
+                            return
                         lock.acquire()
                         if ad not in totalAds:
                             totalAds.add(ad)
@@ -343,6 +357,8 @@ class ZeroConnect:
         sockSet = threading.Event()
         sock = None
 
+        attempts = WaitGroup()
+
         def tryConnect(addr, port):
             nonlocal sock
             localsock = connectOutbound(addr, port)
@@ -386,12 +402,22 @@ class ZeroConnect:
                     return
             finally:
                 lock.release()
+                attempts.done()
                 if shouldClose:
                     sleep(0.1) # If I close immediately after sending, the messages don't get through before the close.  Sigh.
                     messageSock.close()
 
         for addr in ad.addresses:
+            attempts.add(1)
             threading.Thread(target=tryConnect, args=(addr, ad.port), daemon=True).start()
+
+        def awaitFailure():
+            attempts.wait()
+            if not sock:
+                zlog(INFO, f"{addr} No connection attempt succeeded")
+            sockSet.set()
+
+        threading.Thread(target=awaitFailure, args=(), daemon=True).start()
 
         sockSet.wait() # Note that this doesn't wait for the threads to finish.  I *think* that's ok.
 
